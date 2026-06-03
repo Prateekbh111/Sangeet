@@ -109,7 +109,8 @@ function attachMediaListeners(media: HTMLMediaElement): void {
     if (localStateTimer !== null) clearTimeout(localStateTimer);
     localStateTimer = window.setTimeout(() => {
       const vid = currentVideoId();
-      if (!vid) return;
+      if (!vid) { console.log('[BeatSync] localState skipped: no videoId'); return; }
+      console.log(`[BeatSync] sending localState videoId=${vid} paused=${media.paused} pos=${media.currentTime.toFixed(2)}`);
       sendToBg({
         kind: 'localState',
         videoId: vid,
@@ -123,17 +124,19 @@ function attachMediaListeners(media: HTMLMediaElement): void {
     media.addEventListener(ev, fire);
   });
 
-  // Also detect SPA URL changes — YT Music does pushState when changing tracks
-  // without firing media events sometimes.
-  let lastUrl = location.href;
-  const checkUrl = () => {
-    if (location.href !== lastUrl) {
-      lastUrl = location.href;
+  // Also detect SPA URL/videoId changes — YT Music does pushState when changing
+  // tracks without always firing media events.
+  let lastVid = currentVideoId();
+  const checkVid = () => {
+    const v = currentVideoId();
+    if (v !== lastVid) {
+      console.log(`[BeatSync] videoId changed ${lastVid} → ${v}`);
+      lastVid = v;
       fire();
     }
   };
-  setInterval(checkUrl, 500);
-  window.addEventListener('popstate', checkUrl);
+  setInterval(checkVid, 250);
+  window.addEventListener('popstate', checkVid);
 }
 
 async function ensureMedia(): Promise<HTMLMediaElement> {
@@ -233,7 +236,9 @@ async function applyState(
 ): Promise<void> {
   const media = await ensureMedia();
   const curVid = currentVideoId();
+  console.log(`[BeatSync] applyState videoId=${state.videoId} cur=${curVid} paused=${state.paused} pos=${state.position.toFixed(2)}`);
   if (state.videoId && state.videoId !== curVid) {
+    console.log(`[BeatSync] videoId mismatch → navigating to ${state.videoId}`);
     navigateToVideo(state.videoId);
     return;
   }

@@ -155,7 +155,8 @@ interface RouteDoAction {
 }
 
 async function queryLeaderTab(): Promise<unknown> {
-  const tabs = await chrome.tabs.query({ url: '*://music.youtube.com/*' });
+  const all = await chrome.tabs.query({});
+  const tabs = all.filter((t) => typeof t.url === 'string' && /:\/\/music\.youtube\.com\//.test(t.url));
   for (const tab of tabs) {
     if (typeof tab.id !== 'number') continue;
     try {
@@ -167,7 +168,8 @@ async function queryLeaderTab(): Promise<unknown> {
 }
 
 async function forwardDoAction(req: RouteDoAction): Promise<void> {
-  const tabs = await chrome.tabs.query({ url: '*://music.youtube.com/*' });
+  const all = await chrome.tabs.query({});
+  const tabs = all.filter((t) => typeof t.url === 'string' && /:\/\/music\.youtube\.com\//.test(t.url));
   for (const tab of tabs) {
     if (typeof tab.id !== 'number') continue;
     try {
@@ -195,14 +197,19 @@ interface RouteApplyState {
 }
 
 async function forwardApplyState(req: RouteApplyState): Promise<void> {
-  const tabs = await chrome.tabs.query({ url: '*://music.youtube.com/*' });
+  // Query all tabs and filter manually — chrome.tabs.query with a URL filter
+  // can miss PWA standalone windows on some Chromium builds.
+  const all = await chrome.tabs.query({});
+  const tabs = all.filter((t) => typeof t.url === 'string' && /:\/\/music\.youtube\.com\//.test(t.url));
+  const stateObj = req.state as Extract<RuntimeMsg, { kind: 'applyState' }>['state'];
   if (tabs.length === 0) {
-    console.log('[beatsync/bg] no YT Music tab; dropping applyState');
+    console.log('[beatsync/bg] no YT Music tab found; dropping applyState videoId=', stateObj.videoId);
     return;
   }
+  console.log(`[beatsync/bg] forwarding applyState videoId=${stateObj.videoId} paused=${stateObj.paused} → ${tabs.length} tab(s)`);
   const msg: RuntimeMsg = {
     kind: 'applyState',
-    state: req.state as Extract<RuntimeMsg, { kind: 'applyState' }>['state'],
+    state: stateObj,
     expectedLocalStart: req.expectedLocalStart,
     clockOffset: req.clockOffset,
   };
@@ -211,7 +218,7 @@ async function forwardApplyState(req: RouteApplyState): Promise<void> {
     try {
       await chrome.tabs.sendMessage(tab.id, msg);
     } catch (e) {
-      console.warn('[beatsync/bg] tabs.sendMessage failed', e);
+      console.warn('[beatsync/bg] tabs.sendMessage failed tab=', tab.id, e);
     }
   }
 }
