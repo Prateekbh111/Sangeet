@@ -120,7 +120,7 @@ function attachMediaListeners(media: HTMLMediaElement): void {
         paused: media.paused,
         volume: media.volume,
       });
-    }, 100);
+    }, 300);
   };
   (['play', 'pause', 'seeked', 'volumechange', 'ratechange', 'loadstart', 'durationchange', 'ended'] as const).forEach((ev) => {
     media.addEventListener(ev, fire);
@@ -256,19 +256,30 @@ async function applyState(
       lastSeekAt = Date.now();
     }
   } else {
-    // Where leader is RIGHT NOW in our local clock.
+    // Leader is playing. Compute where they are RIGHT NOW in our local clock.
     const senderLocalTime = expectedLocalStart - leadMs;
     const elapsedSec = Math.max(0, nowLocal - senderLocalTime) / 1000;
     const liveExpected = state.position + elapsedSec;
-    const drift = !media.paused ? media.currentTime - liveExpected : Infinity;
-    if (Math.abs(drift) < 0.08) {
-      // Already in sync — drift loop will keep us tight, skip re-seek/glitch.
-    } else {
-      try { media.pause(); } catch { /* ignore */ }
-      const preRollSec = leadMs / 1000;
+    const preRollSec = leadMs / 1000;
+
+    if (media.paused) {
+      // We're paused but leader is playing — full pre-roll + scheduled play.
       media.currentTime = state.position + preRollSec;
       lastSeekAt = Date.now();
       scheduleAt(expectedLocalStart, () => attemptPlay(media));
+    } else {
+      const drift = media.currentTime - liveExpected;
+      // Only hard-resync (pause+seek+replay) for big drift. For small drift
+      // we let the drift loop glide via playbackRate — interrupting playback
+      // on every STATE arrival causes "stuck syncing" loops.
+      if (Math.abs(drift) > 0.4) {
+        try { media.pause(); } catch { /* ignore */ }
+        media.currentTime = state.position + preRollSec;
+        lastSeekAt = Date.now();
+        scheduleAt(expectedLocalStart, () => attemptPlay(media));
+      }
+      // else: drift loop handles via playbackRate; lastApplied refresh below
+      // gives it a fresh reference.
     }
   }
 

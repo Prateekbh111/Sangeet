@@ -206,7 +206,6 @@ async function forwardApplyState(req: RouteApplyState): Promise<void> {
     console.log('[beatsync/bg] no YT Music tab found; dropping applyState videoId=', stateObj.videoId);
     return;
   }
-  console.log(`[beatsync/bg] forwarding applyState videoId=${stateObj.videoId} paused=${stateObj.paused} → ${tabs.length} tab(s)`);
   const msg: RuntimeMsg = {
     kind: 'applyState',
     state: stateObj,
