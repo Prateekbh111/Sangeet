@@ -23,6 +23,8 @@ let localStateTimer: number | null = null;
 let pendingPlay = false;
 let gestureListenerAttached = false;
 let suppressBeforeUnload = false;
+let lastSeekAt = 0;
+const SEEK_THROTTLE_MS = 2500;
 
 // Suppress YT Music's "Leave site? Changes may not be saved." dialog when we
 // navigate the tab to a new track. Registered with capture:true so we run
@@ -251,6 +253,7 @@ async function applyState(
     if (!media.paused) { try { media.pause(); } catch { /* ignore */ } }
     if (Math.abs(media.currentTime - state.position) > 0.08) {
       media.currentTime = state.position;
+      lastSeekAt = Date.now();
     }
   } else {
     // Where leader is RIGHT NOW in our local clock.
@@ -264,6 +267,7 @@ async function applyState(
       try { media.pause(); } catch { /* ignore */ }
       const preRollSec = leadMs / 1000;
       media.currentTime = state.position + preRollSec;
+      lastSeekAt = Date.now();
       scheduleAt(expectedLocalStart, () => attemptPlay(media));
     }
   }
@@ -282,6 +286,11 @@ function startDriftLoop(): void {
       return;
     }
     if (mediaEl.paused) return;
+    // Don't compute drift while a seek or buffering is in progress —
+    // currentTime is frozen during these, drift would look enormous and we'd
+    // re-seek in a loop ("stuck syncing").
+    if (mediaEl.seeking) return;
+    if (mediaEl.readyState < 3 /* HAVE_FUTURE_DATA */) return;
     const expected = expectedPosition(
       lastApplied.state,
       lastApplied.receivedLocal,
@@ -291,7 +300,11 @@ function startDriftLoop(): void {
     const drift = mediaEl.currentTime - expected;
     const action = decideAction(drift);
     if (action.kind === 'seek') {
+      // Throttle hard seeks: YT Music's buffer takes ~300–800ms per seek.
+      // Without this we'd seek every drift-loop tick before playback resumes.
+      if (Date.now() - lastSeekAt < SEEK_THROTTLE_MS) return;
       mediaEl.currentTime = expected;
+      lastSeekAt = Date.now();
       if (mediaEl.playbackRate !== 1) mediaEl.playbackRate = 1;
     } else if (action.kind === 'rate') {
       mediaEl.playbackRate = action.value ?? 1;
