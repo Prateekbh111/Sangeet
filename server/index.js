@@ -87,6 +87,13 @@ wss.on('connection', (ws) => {
     try { msg = JSON.parse(String(raw)); } catch { return; }
     if (!msg || typeof msg.t !== 'string') return;
 
+    // Discovery probe — used by followers scanning the LAN. Replies immediately
+    // with an identifier so the scanner can confirm this is a BeatSync server.
+    if (msg.t === 'PROBE') {
+      send(ws, { t: 'PROBE_OK', service: 'beatsync', version: '1.0' });
+      return;
+    }
+
     if (msg.t === 'JOIN') {
       if (typeof msg.room !== 'string' || typeof msg.peerId !== 'string') return;
       ws.peerId = msg.peerId;

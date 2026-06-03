@@ -18,7 +18,7 @@
       "run_at": "document_idle"
     }
   ],
-  "permissions": ["storage", "scripting", "tabs", "offscreen"],
+  "permissions": ["storage", "scripting", "tabs", "offscreen", "system.network"],
   "host_permissions": ["*://music.youtube.com/*", "ws://*/*", "wss://*/*"],
   "icons": {
     "16": "public/icons/16.png",
