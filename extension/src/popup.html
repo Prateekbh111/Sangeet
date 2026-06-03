@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>BeatSync</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d0d10;
+      --panel: #16161b;
+      --panel-2: #1c1c22;
+      --border: #26262e;
+      --fg: #f2f2f3;
+      --muted: #8c8c98;
+      --muted-2: #5e5e6b;
+      --accent: #6c8cff;
+      --accent-2: #8aa3ff;
+      --ok: #2ecc71;
+      --warn: #f1b500;
+      --err: #ff5d5d;
+      --leader: #f1b500;
+      --shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 8px 24px rgba(0,0,0,.4);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 380px;
+      background: var(--bg);
+      color: var(--fg);
+      font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+    header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .brand { display: flex; align-items: center; gap: 8px; }
+    .brand-dot {
+      width: 22px; height: 22px; border-radius: 6px;
+      background: linear-gradient(135deg, var(--accent), #c084fc);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.05) inset;
+    }
+    h1 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+
+    .badge {
+      font-size: 10px; font-weight: 700; letter-spacing: .08em;
+      padding: 4px 8px; border-radius: 999px;
+      background: var(--panel); border: 1px solid var(--border);
+      color: var(--muted); text-transform: uppercase;
+    }
+    .badge.leader { background: rgba(241,181,0,.12); color: var(--leader); border-color: rgba(241,181,0,.3); }
+    .badge.follower { background: rgba(108,140,255,.10); color: var(--accent-2); border-color: rgba(108,140,255,.3); }
+    .badge.dot::before {
+      content: ''; display: inline-block; width: 6px; height: 6px;
+      border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      box-shadow: var(--shadow);
+    }
+    .panel.tight { padding: 10px; }
+    .row { display: flex; gap: 8px; }
+    .row > * { flex: 1; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    label {
+      font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em;
+    }
+    input[type=text] {
+      width: 100%;
+      background: var(--panel-2); color: var(--fg);
+      border: 1px solid var(--border); border-radius: 7px;
+      padding: 8px 10px; font: inherit;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+      outline: none; transition: border-color .15s;
+    }
+    input[type=text]:focus { border-color: var(--accent); }
+
+    button {
+      background: var(--panel-2); color: var(--fg);
+      border: 1px solid var(--border); border-radius: 7px;
+      padding: 8px 12px; font: inherit; font-weight: 500;
+      cursor: pointer; transition: background .12s, border-color .12s, transform .05s;
+    }
+    button:hover { background: #22222a; }
+    button:active { transform: scale(.98); }
+    button.primary {
+      background: linear-gradient(180deg, var(--accent), #4a6cff);
+      color: #f5f7ff; border-color: transparent; font-weight: 600;
+    }
+    button.primary:hover { filter: brightness(1.08); }
+    button.danger { color: var(--err); border-color: rgba(255,93,93,.3); }
+    button.danger:hover { background: rgba(255,93,93,.08); }
+    button.subtle { background: transparent; }
+    button[disabled] { opacity: .5; cursor: not-allowed; }
+
+    .status-line { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted-2); }
+    .status-dot.connecting { background: var(--warn); animation: pulse 1s ease-in-out infinite; }
+    .status-dot.open { background: var(--ok); }
+    .status-dot.error { background: var(--err); }
+    @keyframes pulse { 50% { opacity: .35; } }
+    .status-text { color: var(--muted); }
+    .status-text.open { color: var(--ok); }
+    .status-text.error { color: var(--err); }
+
+    .peers { display: flex; flex-direction: column; gap: 6px; }
+    .peers .empty { color: var(--muted-2); font-style: italic; padding: 6px 2px; font-size: 12px; }
+    .peer {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px;
+    }
+    .peer .pid { color: var(--fg); }
+    .peer .meta { color: var(--muted); margin-left: auto; font-size: 11px; }
+    .peer .role { font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+    .peer .role.leader { color: var(--leader); background: rgba(241,181,0,.12); }
+    .peer .role.follower { color: var(--accent-2); background: rgba(108,140,255,.10); }
+
+    .toast {
+      background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .toast.alert { border-color: rgba(241,181,0,.35); background: rgba(241,181,0,.06); }
+    .toast.err { border-color: rgba(255,93,93,.35); background: rgba(255,93,93,.06); }
+    .toast-title { font-weight: 600; font-size: 12.5px; }
+    .toast-sub { color: var(--muted); font-size: 11.5px; }
+    .toast-actions { display: flex; gap: 6px; }
+
+    .help { font-size: 11px; color: var(--muted); line-height: 1.5; }
+    .help code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 10.5px; }
+
+    .hide { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="brand-dot"></div>
+        <h1>BeatSync</h1>
+      </div>
+      <span id="roleBadge" class="badge dot">offline</span>
+    </header>
+
+    <div class="panel tight">
+      <div class="field">
+        <label for="server">Signaling server</label>
+        <input type="text" id="server" placeholder="ws://192.168.x.x:8787" autocomplete="off" />
+      </div>
+      <div style="height: 8px;"></div>
+      <div class="field">
+        <label for="room">Room code</label>
+        <input type="text" id="room" placeholder="room1" value="room1" autocomplete="off" />
+      </div>
+      <div style="height: 10px;"></div>
+      <div class="row">
+        <button id="connect" class="primary">Connect</button>
+        <button id="disconnect" class="subtle">Disconnect</button>
+      </div>
+      <div style="height: 10px;"></div>
+      <div class="status-line">
+        <span id="statusDot" class="status-dot"></span>
+        <span id="statusText" class="status-text">idle</span>
+      </div>
+    </div>
+
+    <div id="hostRequestPanel" class="toast alert hide">
+      <div>
+        <div class="toast-title">Host transfer request</div>
+        <div class="toast-sub"><span id="hostReqFrom"></span> wants to become the leader.</div>
+      </div>
+      <div class="toast-actions">
+        <button id="approveHost" class="primary">Approve</button>
+        <button id="denyHost" class="danger">Deny</button>
+      </div>
+    </div>
+
+    <div id="hostDeniedPanel" class="toast err hide">
+      <div>
+        <div class="toast-title">Host request denied</div>
+        <div class="toast-sub">The current leader declined your request.</div>
+      </div>
+      <div class="toast-actions">
+        <button id="dismissDenied" class="subtle">Dismiss</button>
+      </div>
+    </div>
+
+    <div class="panel tight">
+      <label style="margin-bottom: 8px; display:block;">Peers</label>
+      <div id="peers" class="peers">
+        <div class="empty">No peers</div>
+      </div>
+      <div style="height: 10px;"></div>
+      <button id="requestHost" class="subtle hide" style="width: 100%;">Request to become host</button>
+    </div>
+
+    <div class="help">
+      Whoever joins the room first is the leader. If the leader leaves, the next member is promoted. Run <code>npm run server</code> on any device on your LAN and share that URL with the others.
+    </div>
+  </div>
+  <script type="module" src="./popup.ts"></script>
+</body>
+</html>

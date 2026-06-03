@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd unit for the BeatSync signaling server.
+  Install on macOS:
+    1. Edit the absolute paths below if your repo is not at /Users/<you>/Developer/personal/beatsync
+       and update the `node` path if not at /usr/local/bin/node.
+    2. cp server/com.beatsync.signaling.plist ~/Library/LaunchAgents/
+    3. launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.beatsync.signaling.plist
+    4. launchctl print gui/$(id -u)/com.beatsync.signaling     # check status
+  Logs at server/server.log + server.err.log.
+  Uninstall: launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.beatsync.signaling.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.beatsync.signaling</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/Users/prateekbhardwaj/Developer/personal/beatsync/server/index.js</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/prateekbhardwaj/Developer/personal/beatsync</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PORT</key>
+    <string>8787</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/prateekbhardwaj/Developer/personal/beatsync/server/server.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/prateekbhardwaj/Developer/personal/beatsync/server/server.err.log</string>
+</dict>
+</plist>

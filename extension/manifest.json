@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "BeatSync",
+  "version": "0.1.0",
+  "description": "Sync YouTube Music playback across devices.",
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_title": "BeatSync"
+  },
+  "background": {
+    "service_worker": "src/bg.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://music.youtube.com/*"],
+      "js": ["src/content.ts"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["storage", "scripting", "tabs", "offscreen"],
+  "host_permissions": ["*://music.youtube.com/*", "ws://*/*", "wss://*/*"],
+  "icons": {
+    "16": "public/icons/16.png",
+    "48": "public/icons/48.png",
+    "128": "public/icons/128.png"
+  }
+}
