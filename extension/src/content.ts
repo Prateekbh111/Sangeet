@@ -22,6 +22,27 @@ let driftLoopStarted = false;
 let localStateTimer: number | null = null;
 let pendingPlay = false;
 let gestureListenerAttached = false;
+let suppressBeforeUnload = false;
+
+// Suppress YT Music's "Leave site? Changes may not be saved." dialog when we
+// navigate the tab to a new track. Registered with capture:true so we run
+// before YT Music's bubble-phase listener; stopImmediatePropagation prevents
+// theirs from firing.
+if (!alreadyLoaded) {
+  window.addEventListener('beforeunload', (e) => {
+    if (!suppressBeforeUnload) return;
+    e.stopImmediatePropagation();
+    // Some browsers also check returnValue / preventDefault — clear them.
+    (e as BeforeUnloadEvent).returnValue = '';
+  }, { capture: true });
+}
+
+function navigateToVideo(videoId: string): void {
+  suppressBeforeUnload = true;
+  // Belt + suspenders: clear any onbeforeunload assignment YT Music made.
+  try { window.onbeforeunload = null; } catch { /* ignore */ }
+  location.assign('https://music.youtube.com/watch?v=' + encodeURIComponent(videoId));
+}
 
 function currentVideoId(): string | null {
   // Primary: URL ?v= param (works on /watch routes).
@@ -213,9 +234,7 @@ async function applyState(
   const media = await ensureMedia();
   const curVid = currentVideoId();
   if (state.videoId && state.videoId !== curVid) {
-    location.assign(
-      'https://music.youtube.com/watch?v=' + encodeURIComponent(state.videoId),
-    );
+    navigateToVideo(state.videoId);
     return;
   }
 
@@ -310,9 +329,7 @@ if (!alreadyLoaded) chrome.runtime.onMessage.addListener((message, _sender, send
     }
     case 'navigate': {
       if (currentVideoId() !== msg.videoId) {
-        location.assign(
-          'https://music.youtube.com/watch?v=' + encodeURIComponent(msg.videoId),
-        );
+        navigateToVideo(msg.videoId);
       }
       return false;
     }
