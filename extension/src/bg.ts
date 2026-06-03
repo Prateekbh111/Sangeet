@@ -85,7 +85,6 @@ const OFFSCREEN_KINDS: ReadonlySet<string> = new Set([
   'getStatus',
   'connectRoom',
   'disconnect',
-  'discover',
   'requestHost',
   'grantHost',
   'denyHost',

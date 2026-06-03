@@ -22,7 +22,7 @@ interface StatusResponse {
 }
 
 const STORE = 'beatsync:popup';
-const DEFAULT_URL = '';
+const DEFAULT_URL = 'ws://localhost:8787';
 const DEFAULT_ROOM = 'room1';
 
 const $ = <T extends HTMLElement>(id: string): T => {
@@ -35,7 +35,6 @@ const serverIn = $<HTMLInputElement>('server');
 const roomIn = $<HTMLInputElement>('room');
 const connectBtn = $<HTMLButtonElement>('connect');
 const disconnectBtn = $<HTMLButtonElement>('disconnect');
-const discoverBtn = $<HTMLButtonElement>('discover');
 const statusDot = $<HTMLSpanElement>('statusDot');
 const statusText = $<HTMLSpanElement>('statusText');
 const peersEl = $<HTMLDivElement>('peers');
@@ -170,39 +169,12 @@ async function refreshStatus(): Promise<void> {
   }
 }
 
-async function runDiscovery(): Promise<string | null> {
-  setStatus('connecting', 'scanning LAN…');
-  discoverBtn.disabled = true;
-  connectBtn.disabled = true;
-  try {
-    const resp = await send<{ ok: boolean; url: string | null }>({ kind: 'discover' });
-    if (resp?.ok && resp.url) {
-      serverIn.value = resp.url;
-      savePrefs();
-      setStatus('open', `found ${resp.url}`);
-      return resp.url;
-    }
-    setStatus('error', 'no BeatSync server found on LAN');
-    return null;
-  } finally {
-    discoverBtn.disabled = false;
-    connectBtn.disabled = false;
-  }
-}
-
-discoverBtn.addEventListener('click', () => { void runDiscovery(); });
-
 connectBtn.addEventListener('click', async () => {
-  let url = serverIn.value.trim();
+  const url = serverIn.value.trim() || DEFAULT_URL;
   const room = roomIn.value.trim();
   if (!room) {
     setStatus('error', 'enter a room code');
     return;
-  }
-  if (!url) {
-    const found = await runDiscovery();
-    if (!found) return;
-    url = found;
   }
   savePrefs();
   await send({ kind: 'connectRoom', url, room });

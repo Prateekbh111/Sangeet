@@ -168,91 +168,6 @@ function openWs(url: string, room: string): void {
   });
 }
 
-// ---------- LAN auto-discovery ----------
-
-const DEFAULT_PORT = 8787;
-
-interface NetIface { name: string; address: string; prefixLength: number }
-
-async function getLanSubnets(): Promise<string[]> {
-  const sys = (chrome as unknown as { system?: { network?: { getNetworkInterfaces?: (cb: (a: NetIface[]) => void) => void } } }).system;
-  if (!sys?.network?.getNetworkInterfaces) {
-    console.warn('[beatsync/offscreen] chrome.system.network unavailable');
-    return [];
-  }
-  const ifaces = await new Promise<NetIface[]>((resolve) => {
-    sys.network!.getNetworkInterfaces!((arr) => resolve(arr ?? []));
-  });
-  const subnets = new Set<string>();
-  for (const i of ifaces) {
-    if (!i.address.includes('.')) continue;     // IPv4 only
-    if (i.address.startsWith('127.')) continue; // loopback
-    if (i.address.startsWith('169.254.')) continue; // link-local
-    const parts = i.address.split('.');
-    if (parts.length !== 4) continue;
-    subnets.add(`${parts[0]}.${parts[1]}.${parts[2]}`);
-  }
-  return [...subnets];
-}
-
-function probeUrl(url: string, timeoutMs: number): Promise<string | null> {
-  return new Promise((resolve) => {
-    let done = false;
-    let ws: WebSocket;
-    try { ws = new WebSocket(url); }
-    catch { resolve(null); return; }
-    const finish = (val: string | null): void => {
-      if (done) return;
-      done = true;
-      try { ws.close(); } catch { /* ignore */ }
-      resolve(val);
-    };
-    const timer = window.setTimeout(() => finish(null), timeoutMs);
-    ws.addEventListener('open', () => {
-      try { ws.send(JSON.stringify({ t: 'PROBE' })); }
-      catch { finish(null); }
-    });
-    ws.addEventListener('message', (ev) => {
-      if (typeof ev.data !== 'string') return;
-      try {
-        const m = JSON.parse(ev.data) as { t?: string; service?: string };
-        if (m.t === 'PROBE_OK' && m.service === 'beatsync') {
-          clearTimeout(timer);
-          finish(url);
-        }
-      } catch { /* ignore */ }
-    });
-    ws.addEventListener('error', () => { clearTimeout(timer); finish(null); });
-    ws.addEventListener('close', () => { clearTimeout(timer); finish(null); });
-  });
-}
-
-async function discoverServer(port = DEFAULT_PORT, perProbeMs = 1500, parallel = 64): Promise<string | null> {
-  // Always try localhost first — instant win when server runs on this machine.
-  const fast = await probeUrl(`ws://localhost:${port}`, 600);
-  if (fast) return fast;
-
-  const subnets = await getLanSubnets();
-  if (subnets.length === 0) return null;
-
-  const hosts: string[] = [];
-  for (const s of subnets) {
-    for (let h = 1; h <= 254; h++) hosts.push(`ws://${s}.${h}:${port}`);
-  }
-  console.log(`[beatsync/offscreen] scanning ${hosts.length} candidates on ${subnets.length} subnet(s)`);
-
-  for (let i = 0; i < hosts.length; i += parallel) {
-    const batch = hosts.slice(i, i + parallel);
-    const results = await Promise.all(batch.map((u) => probeUrl(u, perProbeMs)));
-    const hit = results.find((r) => r !== null);
-    if (hit) {
-      console.log('[beatsync/offscreen] discovered server at', hit);
-      return hit;
-    }
-  }
-  return null;
-}
-
 function connectRoom(url: string, room: string): void {
   // Tear down existing session but keep wantConnected for reconnects after open.
   if (session.ws) {
@@ -592,7 +507,6 @@ type OffscreenMsg =
   | { kind: 'getStatus' }
   | { kind: 'connectRoom'; url: string; room: string }
   | { kind: 'disconnect' }
-  | { kind: 'discover' }
   | { kind: 'requestHost' }
   | { kind: 'grantHost'; to: string }
   | { kind: 'denyHost'; to: string }
@@ -606,7 +520,7 @@ function isOffscreenMsg(x: unknown): x is OffscreenMsg {
   const k = (x as { kind?: unknown }).kind;
   return (
     k === 'getStatus' ||
-    k === 'connectRoom' || k === 'disconnect' || k === 'discover' ||
+    k === 'connectRoom' || k === 'disconnect' ||
     k === 'requestHost' || k === 'grantHost' || k === 'denyHost' || k === 'ackDenied' ||
     k === 'localState' || k === 'driftReport'
   );
@@ -656,10 +570,6 @@ async function handle(msg: OffscreenMsg): Promise<unknown> {
     case 'disconnect':
       disconnectWs();
       return { ok: true };
-    case 'discover': {
-      const found = await discoverServer();
-      return { ok: found !== null, url: found };
-    }
     case 'requestHost':
       wsSend({ t: 'REQUEST_HOST' });
       return { ok: true };
