@@ -14,6 +14,12 @@
   "content_scripts": [
     {
       "matches": ["*://music.youtube.com/*"],
+      "js": ["src/no-beforeunload.ts"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["*://music.youtube.com/*"],
       "js": ["src/content.ts"],
       "run_at": "document_idle"
     }

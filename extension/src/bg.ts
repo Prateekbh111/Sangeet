@@ -58,20 +58,25 @@ void reinjectIntoOpenTabs();
 async function reinjectIntoOpenTabs(): Promise<void> {
   try {
     const manifest = chrome.runtime.getManifest();
-    const cs = manifest.content_scripts?.[0];
-    const files = cs?.js;
-    if (!files || files.length === 0) return;
+    const scripts = manifest.content_scripts ?? [];
+    if (scripts.length === 0) return;
     const tabs = await chrome.tabs.query({ url: '*://music.youtube.com/*' });
     for (const tab of tabs) {
       if (typeof tab.id !== 'number') continue;
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files,
-        });
-        console.log('[beatsync/bg] reinjected content into tab', tab.id);
-      } catch (e) {
-        console.log('[beatsync/bg] reinject failed tab=', tab.id, e);
+      for (const cs of scripts) {
+        const files = cs.js;
+        if (!files || files.length === 0) continue;
+        const world = (cs as { world?: 'ISOLATED' | 'MAIN' }).world;
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files,
+            world: world === 'MAIN' ? 'MAIN' : 'ISOLATED',
+          });
+          console.log(`[beatsync/bg] reinjected ${files.join(',')} (world=${world ?? 'ISOLATED'}) into tab ${tab.id}`);
+        } catch (e) {
+          console.log('[beatsync/bg] reinject failed tab=', tab.id, files, e);
+        }
       }
     }
   } catch (e) {
