@@ -221,7 +221,7 @@ function handleSig(m: SigMsg): void {
       // playback state to all open peers so followers stay in sync seamlessly.
       if (m.role === 'leader' && prevRole !== 'leader') {
         for (const peer of session.peers.values()) {
-          if (peer.dc?.readyState === 'open') void sendStateToPeer(peer);
+          if (peer.dc?.readyState === 'open') void sendStateToPeerWithRetry(peer);
         }
         ensureHeartbeat();
       }
@@ -343,7 +343,8 @@ function attachDataChannel(peer: PeerCtx, dc: RTCDataChannel): void {
       sendMsg(peer, { t: 'PING', id: crypto.randomUUID(), t1: Date.now() });
     }, 2000);
     // Leader: push current state to the freshly-connected follower.
-    if (session.role === 'leader') void sendStateToPeer(peer);
+    // Retry a few times in case the leader's media snapshot isn't ready yet.
+    if (session.role === 'leader') void sendStateToPeerWithRetry(peer);
     ensureHeartbeat();
   });
   dc.addEventListener('close', () => {
@@ -450,8 +451,21 @@ async function fetchLeaderSnapshot(): Promise<MediaSnapshot | null> {
   return null;
 }
 
-async function sendStateToPeer(peer: PeerCtx): Promise<void> {
+async function sendStateToPeerWithRetry(peer: PeerCtx, attemptsLeft = 5, delayMs = 800): Promise<void> {
   const snap = await fetchLeaderSnapshot();
+  if (snap && snap.ready && snap.videoId) {
+    // Snapshot ready — delegate to the normal path.
+    return sendStateToPeer(peer, snap);
+  }
+  if (attemptsLeft <= 0) return;
+  window.setTimeout(
+    () => void sendStateToPeerWithRetry(peer, attemptsLeft - 1, delayMs),
+    delayMs,
+  );
+}
+
+async function sendStateToPeer(peer: PeerCtx, snap?: MediaSnapshot): Promise<void> {
+  if (!snap) snap = await fetchLeaderSnapshot() ?? undefined;
   if (!snap || !snap.ready || !snap.videoId) return;
   const seq = ++session.leaderSeq;
   const scheduledWallTime = Date.now() + Math.max(80, peer.clock.rtt() / 2 || 80) + 150;

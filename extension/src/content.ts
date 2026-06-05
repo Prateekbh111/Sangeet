@@ -52,8 +52,11 @@ function currentVideoId(): string | null {
     const fromUrl = new URL(location.href).searchParams.get('v');
     if (fromUrl) return fromUrl;
   } catch { /* fall through */ }
-  // Fallback: YT Music keeps the active song's link in the player bar / mini-player.
-  // Works on home, explore, library, etc. while a track is playing.
+  // Secondary: MAIN-world script exposes the player's video ID here.
+  // Reliable for audio-only tracks and pages without ?v= (home, library, etc.).
+  const fromPlayer = document.documentElement.dataset.beatsyncVid;
+  if (fromPlayer) return fromPlayer;
+  // Fallback: YT Music keeps the active song's link in the player bar.
   const selectors = [
     'ytmusic-player-bar a[href*="watch?v="]',
     'ytmusic-player-bar a.yt-simple-endpoint[href*="watch?v="]',
